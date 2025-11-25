@@ -110,7 +110,7 @@ class ImgProcessing:
             return
         sorted_anns = sorted(anns, key=(lambda x: x['area']), reverse=True)
 
-        print(f"不规则微粒数量: {len(sorted_anns)}")
+        print(f"Irregular particle count: {len(sorted_anns)}")
 
         areas = [ann['area'] for ann in sorted_anns[1:]]
         if self.max_d == 0:
@@ -127,7 +127,7 @@ class ImgProcessing:
         filtered_anns = [ann for ann in sorted_anns if lower_bound <= ann['area'] <= upper_bound]
 
         if len(filtered_anns) == 0:
-            print("没有找到范围内的粒子")
+            print("No particles found within the specified range")
             return
 
         filtered_anns = sorted(filtered_anns, key=(lambda x: x['area']), reverse=True)
@@ -163,7 +163,7 @@ class ImgProcessing:
             })            
 
         ax.imshow(img)
-        print(f"不规则微粒数量: {particle_count}")
+        print(f"Irregular particle count: {particle_count}")
         plt.axis('off')
 
         plt.gca().xaxis.set_major_locator(plt.NullLocator())
@@ -306,7 +306,7 @@ class ImgProcessing:
 
         if self.is_auto_auto_scale_info:
             if scale.shape[0] == 0 or scale.shape[1] == 0:
-                raise RuntimeError("无法自动识别比例尺，确保比例尺在图像最下方且为黑底白字，或进行手动输入")
+                raise RuntimeError("Unable to automatically detect the scale. Ensure the scale is at the bottom of the image with a black background and white text, or enter it manually.")
             else:
                 y_center = int(binary_scale.shape[0] / 2)
                 flag = False
@@ -321,13 +321,13 @@ class ImgProcessing:
                         if binary_scale[y_center][i] == 0:
                             flag = False
                 if px_length == 0:
-                    raise RuntimeError("无法自动识别比例尺，请手动输入")
+                    raise RuntimeError("Unable to automatically detect the scale. Please enter it manually.")
                 else:
                     self.px_length = px_length
                 ocr = CnOcr()
                 out = ocr.ocr(scale)
                 if len(out) == 0:
-                    raise RuntimeError("无法自动识别比例尺，请手动输入")
+                    raise RuntimeError("Unable to automatically detect the scale. Please enter it manually.")
                 else:
                     text = ''.join([item['text'] for item in out])
                     self.unit = re.search(r"[a-zA-Z]+", text).group()

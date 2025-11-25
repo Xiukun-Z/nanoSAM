@@ -48,21 +48,21 @@ class WebUI:
     def __init__(self):
         self.pro_img = None
         self.input_img_tif = None
-        with gr.Blocks(css=css, title="天津大学化工学院大型仪器测试平台") as demo:
+        with gr.Blocks(css=css, title="The Advanced Instrumental Analysis Center, School of Chemical Engineering and Technology, Tianjin University") as demo:
             with gr.Row(elem_classes='head-bar'):
                 gr.Markdown(value=f"<div style='display: flex;justify-content: center;align-items: center;'>"
                                   f"<a style='position: absolute;left: 0;' href='https://www.clickgene.org/about/'>"
                                   f"<img style='height:60px;width:auto' src='{logo_img}'/></a>"
                                   f"<div style='font-size: 2.5rem;margin-left: 24px; color: #52c2f9;text-shadow: 1px 1px 2px black;'>"
-                                  f"天津大学化工学院大型仪器测试平台"
+                                  f"The Advanced Instrumental Analysis Center, School of Chemical Engineering and Technology, Tianjin University"
                                   f"</div></div>")
             with gr.Row():
                 with gr.Column():
-                    gr.Markdown('# 输入图片')
+                    gr.Markdown('# Input Image')
                     self.input_img = gr.Image(elem_id="max-image", sources=['upload'], image_mode="RGBA")
-                    gr.Markdown('## 参数设置')
+                    gr.Markdown('## Parameter Settings')
 
-                    self.process_speed = gr.Dropdown(["低质量", "中质量", "高质量"], label="处理质量", value='中质量')
+                    self.process_speed = gr.Dropdown(["Low Quality", "Medium Quality", "High Quality"], label="Processing Quality", value='Medium Quality')
                     self.points_per_side = 48
                     self.pred_iou_thresh = 0.4
                     self.stability_score_thresh = 0.5
@@ -73,32 +73,32 @@ class WebUI:
                     with gr.Row():
                         with gr.Column():
                             with gr.Row():
-                                self.img_distance = gr.Number(value=0, label='比例尺物理长度')
-                                self.img_unit = gr.Dropdown(["nm", "um", "mm", "cm"], label="比例尺单位",
+                                self.img_distance = gr.Number(value=0, label='Scale Physical Length')
+                                self.img_unit = gr.Dropdown(["nm", "um", "mm", "cm"], label="Scale Unit",
                                                                      value='nm')
-                                self.px_length_input = gr.Number(value=0, label='比例尺像素长度(px)')
+                                self.px_length_input = gr.Number(value=0, label='Scale Length in Pixels (px)')
                             with gr.Row():
-                                self.open_auto_scale_info = gr.Checkbox(label="自动识别比例尺信息", value=True)
-                    self.fig_length = gr.Number(value=10, label='表格步长')
+                                self.open_auto_scale_info = gr.Checkbox(label="Automatically Detect Scale Info", value=True)
+                    self.fig_length = gr.Number(value=10, label='Table Step Length')
                     self.roi_boxes = []
-                    self.box_info = gr.Markdown('未选框')
-                    self.select_box_btn = gr.Button("框选ROI（弹窗）")
-                    self.upload_button = gr.Button("开始识别纳米粒子")
-                    self.clear_box_btn = gr.Button("清空框（识别后再点击）")
+                    self.box_info = gr.Markdown('No boxes selected')
+                    self.select_box_btn = gr.Button("Select ROI (Popup)")
+                    self.upload_button = gr.Button("Start Nanoparticle Recognition")
+                    self.clear_box_btn = gr.Button("Clear Boxes (Click after recognition)")
                     self.process_speed.change(self.update_dropdowns, inputs=[self.process_speed])
                 with gr.Column():
-                    gr.Markdown('# 处理结果')
+                    gr.Markdown('# Processing Results')
                     self.output = gr.Image(elem_id="output-image")
-                    gr.Markdown('# 纳米粒径统计图表')
+                    gr.Markdown('# Nanoparticle Size Statistics Chart')
                     self.output_fig = gr.Image(elem_id="fig-image")
                     with gr.Row():
-                        self.fig_min_slider = gr.Slider(label="最小直径", value=0)
-                        self.fig_max_slider = gr.Slider(label="最大直径", value=0)
-                    self.redraw_fig = gr.Button("更改直径")
+                        self.fig_min_slider = gr.Slider(label="Minimum Diameter", value=0)
+                        self.fig_max_slider = gr.Slider(label="Maximum Diameter", value=0)
+                    self.redraw_fig = gr.Button("Change Diameter")
 
-                    self.output_csv = gr.Button("导出结果至本地")
+                    self.output_csv = gr.Button("Export Results to Local")
                     self.download_zip = gr.File(
-                        label="请点击右侧蓝色文本，下载当前结果",
+                        label="Please click the blue text on the right to download the current results",
                         elem_id="download-zip"
                     )                                        
             
@@ -147,8 +147,8 @@ class WebUI:
 
         unit = self.pro_img.unit
         scale_factor = self.pro_img.scale_factor
-        max_text = "最小直径/" + unit
-        min_text = "最大直径/" + unit
+        max_text = "Minimum Diameter/" + unit
+        min_text = "Maximum Diameter/" + unit
         self.fig_min_slider = gr.Slider(label=max_text, minimum=0, maximum=self.pro_img.max_d)
         self.fig_max_slider = gr.Slider(label=min_text, value=self.pro_img.max_d, minimum=0, maximum=self.pro_img.max_d)
         return res, res_fig, self.fig_min_slider, self.fig_max_slider, self.pro_img.distance, self.pro_img.unit, self.pro_img.px_length/scale_factor
@@ -159,7 +159,7 @@ class WebUI:
         return res, res_fig
     def select_boxes_popup(self):
         if self.input_img_tif is None:
-            raise gr.Error("请先上传图片再框选。")
+            raise gr.Error("Please upload an image before selecting boxes.")
 
         import cv2
 
@@ -234,20 +234,20 @@ class WebUI:
         except cv2.error:
             pass
         self.roi_boxes = boxes
-        return f"已选 {len(self.roi_boxes)} 个框"
+        return f"Selected {len(self.roi_boxes)} boxes"
 
     def clear_boxes(self):
         self.roi_boxes = []
-        return "已清空框"
+        return "Cleared boxes"
     def update_dropdowns(self, input):
-        if input == '低质量':
+        if input == 'Low Quality':
             self.points_per_side = 32
             self.pred_iou_thresh = 0.4
             self.stability_score_thresh = 0.5
             self.crop_n_layers = 1
             self.crop_n_points_downscale_factor = 5
             self.min_mask_region_area = 50
-        elif input == '中质量':
+        elif input == 'Medium Quality':
             self.points_per_side = 48
             self.pred_iou_thresh = 0.4
             self.stability_score_thresh = 0.5
@@ -265,7 +265,7 @@ class WebUI:
     def export_results(self):
 
         if not hasattr(self.pro_img, "particle_records"):
-            raise gr.Error("请先运行一次识别流程，然后再导出。")
+            raise gr.Error("Please run the recognition process at least once before exporting.")
 
         tmp_dir = os.path.join("temp_outputs")
         os.makedirs(tmp_dir, exist_ok=True)
