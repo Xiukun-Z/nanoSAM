@@ -18,10 +18,29 @@ img {
 }
 
 div.head-bar {
-    height: 60px;
+    height: 110px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     box-shadow: 0 15px 10px #000000;
 }
-
+.header-container {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    width: auto;
+}
+.header-container a {
+    display: flex;
+    align-items: center;
+}
+.header-text {
+    font-size: 2.5rem;
+    color: #52c2f9;
+    text-shadow: 1px 1px 2px black;
+    text-align: center;
+}
 footer.svelte-1rjryqp {
     display:none !important;
 }
@@ -50,10 +69,10 @@ class WebUI:
         self.input_img_tif = None
         with gr.Blocks(css=css, title="The Advanced Instrumental Analysis Center, School of Chemical Engineering and Technology, Tianjin University") as demo:
             with gr.Row(elem_classes='head-bar'):
-                gr.Markdown(value=f"<div style='display: flex;justify-content: center;align-items: center;'>"
-                                  f"<a style='position: absolute;left: 0;' href='https://www.clickgene.org/about/'>"
+                gr.Markdown(value=f"<div class='header-container'>"
+                                  f"<a href='https://www.clickgene.org/about/'>"
                                   f"<img style='height:60px;width:auto' src='{logo_img}'/></a>"
-                                  f"<div style='font-size: 2.5rem;margin-left: 24px; color: #52c2f9;text-shadow: 1px 1px 2px black;'>"
+                                  f"<div class='header-text'>"
                                   f"The Advanced Instrumental Analysis Center, School of Chemical Engineering and Technology, Tianjin University"
                                   f"</div></div>")
             with gr.Row():
