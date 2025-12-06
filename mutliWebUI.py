@@ -8,8 +8,12 @@ import csv
 from PIL import Image
 import numpy as np
 import cv2
+from rsciio.digitalmicrograph import file_reader as dm_read
+from rsciio.emd import file_reader as emd_read
+from rsciio.tia import file_reader as tia_read
+from rsciio.tiff import file_reader as tiff_read
 
-from mutilprocess_img_MORE_REGION_OCR import ImgProcessing
+from mutilprocess_img import ImgProcessing
 from img import logo_img
 
 # css
@@ -76,6 +80,7 @@ class WebUI:
         self.roi_boxes = []
         self.roi_points = []
         self.batch_last_zip = None
+        self.input_img_path = None
 
         with gr.Blocks(
             css=css,
@@ -91,16 +96,19 @@ class WebUI:
             with gr.Row():
                 with gr.Column():
                     gr.Markdown('## Single Image Processing (Interactive)')
+                    self.input_file = gr.File(
+                        label="Single Input (image or raw data)",
+                        file_types=["image", ".dm3", ".dm4", ".tif", ".tiff", ".emd", ".emi"]
+                    )
                     self.input_img = gr.Image(
                         elem_id="max-image",
-                        sources=['upload'],
-                        image_mode="RGBA"
+                        image_mode="RGBA",
+                        interactive=False
                     )
-
                     gr.Markdown('## Batch Image Processing (same experiment, shared parameters)')
                     self.batch_files = gr.Files(
                         label="Batch Input Images (same experiment)",
-                        file_types=["image"]
+                        file_types=["image", ".dm3", ".dm4", ".tif", ".tiff", ".emd", ".emi"]
                     )
 
                     gr.Markdown('## Parameter Settings (shared for single & batch)')
@@ -224,10 +232,10 @@ class WebUI:
                 outputs=[self.output, self.output_fig]
             )
 
-            self.input_img.upload(
-                self.fix_image,
-                inputs=self.input_img,
-                outputs=self.input_img
+            self.input_file.upload(
+                self.handle_single_upload,
+                inputs=[self.input_file, self.img_distance, self.img_unit, self.px_length_input],
+                outputs=[self.input_img, self.img_distance, self.img_unit, self.px_length_input]
             )
 
             self.output_csv.click(
@@ -237,13 +245,51 @@ class WebUI:
             )
 
         demo.launch(show_error=True, server_name="127.0.0.1", server_port=7860)
+    def handle_single_upload(self, file, cur_distance, cur_unit, cur_px_length):
 
+        if file is None:
+            raise gr.Error("Please upload a file.")
 
-    def fix_image(self, input_img):
-        self.input_img_tif = input_img
-        return input_img
+        path = file.name if hasattr(file, "name") else file
+        self.input_img_path = path
+
+        img_rgb, pixel_size, meta_unit = load_with_metadata(path)
+
+        if img_rgb is not None:
+            distance = float(pixel_size)
+            unit = meta_unit
+            px_length = 1.0
+
+        else:
+            try:
+                pil_img = Image.open(path).convert("RGB")
+            except Exception:
+                raise gr.Error("Unsupported file format: cannot decode as image or known raw data.")
+            img_rgb = np.array(pil_img)
+
+            distance = cur_distance
+            unit = cur_unit
+            px_length = cur_px_length
+
+        self.input_img_tif = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+
+        return img_rgb, distance, unit, px_length
+
+    def fix_image(self, input_img_path):
+        self.input_img_path = input_img_path
+        img = cv2.imread(input_img_path, cv2.IMREAD_COLOR)
+        if img is None:
+            raise gr.Error("Failed to read image. Please upload a valid image file.")
+
+        self.input_img_tif = img
+        return input_img_path
 
     def detect_scale_from_img(self):
+        if self.input_img_path is not None:
+            _, pixel_size, unit = load_with_metadata(self.input_img_path)
+            if pixel_size is not None and unit is not None:
+                return float(pixel_size), unit, 1.0
+
         if self.input_img_tif is None:
             raise gr.Error("Please upload an image before detecting scale bar.")
 
@@ -561,9 +607,15 @@ class WebUI:
 
         with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             for f in batch_files:
-                pil_img = Image.open(f.name).convert("RGB")
-                img_np = np.array(pil_img)
-                img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+                path = f.name
+
+                img_rgb, _, _ = load_with_metadata(path)
+
+                if img_rgb is None:
+                    pil_img = Image.open(path).convert("RGB")
+                    img_rgb = np.array(pil_img)
+
+                img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
 
                 proc = ImgProcessing()
                 proc.set_config(
@@ -649,3 +701,79 @@ class WebUI:
 
         self.batch_last_zip = zip_path
         return zip_path
+def load_with_metadata(path):
+
+    _, ext = os.path.splitext(path)
+    ext = ext.lower()
+
+    img_rgb = None
+    pixel_size = None
+    unit = None
+
+    try:
+        if ext in ('.dm3', '.dm4'):
+            dm = dm_read(path)
+            pixel_size = round(float(
+                dm[0]['original_metadata']["ImageList"]["TagGroup0"]["ImageData"]
+                 ["Calibrations"]["Dimension"]["TagGroup0"]["Scale"]
+            ), 4)
+            unit = "nm"
+
+            detector = dm[0]['original_metadata']["ImageList"]["TagGroup0"]["ImageTags"][
+                "Microscope Info"
+            ]["Illumination Mode"]
+
+            img = dm[0]["data"]
+            img = (img / img.max()) * 255
+            img = cv2.normalize(img, None, 0, 255.0,
+                                cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            if detector != "TEM":
+                img_rgb = cv2.bitwise_not(img_rgb)
+
+        elif ext in ('.tif', '.tiff'):
+            tiff = tiff_read(path)
+            pixel_size = round(float(tiff[0]['axes'][0]['scale']) * 1e6, 3)
+            unit = "um"
+
+            img = tiff[0]["data"]
+            img = (img / img.max()) * 255
+            img = cv2.normalize(img, None, 0, 255.0,
+                                cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+
+        elif ext == '.emd':
+            emd = emd_read(path)
+            pixel_size = round(float(
+                emd[0]['original_metadata']["BinaryResult"]['PixelSize']["width"]
+            ) * 1e9, 3)
+            unit = "nm"
+
+            detector = emd[0]['original_metadata']['BinaryResult']['Detector']
+            img = emd[0]["data"]
+            img = cv2.normalize(img, None, 0, 255.0,
+                                cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            if detector != 'BM-Ceta':
+                img_rgb = cv2.bitwise_not(img_rgb)
+
+        elif ext == '.emi':
+            tia = tia_read(path)
+            pixel_size = round(float(
+                tia[0]['original_metadata']['ser_header_parameters']['CalibrationDeltaX']
+            ) * 1e9, 3)
+            unit = "nm"
+
+            img = tia[0]['data']
+            img = (img / img.max()) * 255
+            img = cv2.normalize(img, None, 0, 255.0,
+                                cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            img_rgb = cv2.bitwise_not(img_rgb)
+
+    except Exception:
+        img_rgb = None
+        pixel_size = None
+        unit = None
+
+    return img_rgb, pixel_size, unit

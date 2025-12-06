@@ -18,3 +18,6 @@ psutil~=5.9.8
 defusedxml~=0.7.1
 cnocr~=2.3.0.3
 gradio~=4.44.1
+rosettasciio~=0.10.0
+h5py
+tifffile
